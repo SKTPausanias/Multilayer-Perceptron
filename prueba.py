@@ -1,4 +1,3 @@
-from matplotlib import pyplot as plt
 import pandas as pd
 import sys
 import numpy as np
@@ -19,7 +18,6 @@ class MyNeuralNetwork():
         self.alpha = alpha
         self.epochs = epochs
         self.params = {}
-        self.loss = []
 
         print("architecture", self.layers)
     
@@ -49,7 +47,6 @@ class MyNeuralNetwork():
             yhat, loss = self.forward_prop(X, y)
             self.backward_prop(X, yhat, y)
             print("Epoch: {}, Loss: {}".format(i, loss))
-            self.loss.append(loss)
 
     def forward_prop(self, X, y):
         """
@@ -64,16 +61,8 @@ class MyNeuralNetwork():
         z2 = a1.dot(self.params['W2']) + self.params['b2']
         a2 = self.relu(z2)
         z3 = a2.dot(self.params['W3']) + self.params['b3']
-        #print("z3", z3)
         y_hat = self.sigmoid(z3)
-        #y_hat = self.soft_max(z3)
-        #print("y_hat", y_hat)
-        #y_hat = np.argmax(y_hat, axis=1)
-        #resize y_hat to be a vector
-        #y_hat = y_hat.reshape(y_hat.shape[0], 1)
-        #print("y_hat", y_hat)
-
-        loss = self.cross_entropy(y, y_hat)
+        loss = self.entropy_loss(y, y_hat)
 
         self.params['z1'] = z1
         self.params['a1'] = a1
@@ -134,48 +123,43 @@ class MyNeuralNetwork():
         rounded = np.round(y_hat)
         return rounded
 
-    def soft_max(self, z):
-        """
-        Softmax output function.
-        Args:
-        z: has to be an numpy.ndarray, a vector of dimension n * 1.
-        Returns:
-        The softmax of each input.
-        None if z is an empty numpy.ndarray.
-        Raises:
-        This function should not raise any Exception.
-        """
-        if z.size == 0 or z is None:
-            return None
-        return np.exp(z) / np.sum(np.exp(z), axis=1, keepdims=True)
-    
-    def derivative_soft_max(self, z):
-        """
-        Derivative of the softmax output function.
-        Args:
-        z: has to be an numpy.ndarray, a vector of dimension n * 1.
-        Returns:
-        The derivative of the softmax of each input.
-        None if z is an empty numpy.ndarray.
-        Raises:
-        This function should not raise any Exception.
-        """
-        if z.size == 0 or z is None:
-            return None
-        return self.soft_max(z) * (1 - self.soft_max(z))
-
-
     def eta(self, x):
       ETA = 0.0000000001
       return np.maximum(x, ETA)
 
-    def cross_entropy(self, y, y_hat):
-        '''
-        The cross entropy function takes in two real numbers and 
-        returns the cross entropy between them.
-        '''
-        return -1/y.shape[0] * np.sum(y * np.log(self.eta(y_hat)) + (1-y) * np.log(self.eta(1-y_hat)))
 
+    def sigmoid(self,Z):
+        '''
+        The sigmoid function takes in real numbers in any range and 
+        squashes it to a real-valued output between 0 and 1.
+        '''
+        return 1/(1+np.exp(-Z))
+
+    def entropy_loss(self,y, yhat):
+        nsample = len(y)
+        yhat_inv = 1.0 - yhat
+        y_inv = 1.0 - y
+        yhat = self.eta(yhat) ## clips value to avoid NaNs in log
+        yhat_inv = self.eta(yhat_inv) 
+        loss = -1/nsample * (np.sum(np.multiply(np.log(yhat), y) + np.multiply((y_inv), np.log(yhat_inv))))
+        return loss
+    
+
+    def soft_max(self, x):
+        """
+        Compute the softmax of a vector.
+        Args:
+        x: has to be an numpy.ndarray, a vector.
+        Returns:
+        The softmax value as a numpy.ndarray.
+        None if x is an empty numpy.ndarray.
+        Raises:
+        This function should not raise any Exception.
+        """
+        if x.size == 0 or x is None:
+            return None
+        return np.exp(x) / np.sum(np.exp(x))
+    
     def relu(self,Z):
         '''
         The ReLu activation function is to performs a threshold
@@ -188,15 +172,7 @@ class MyNeuralNetwork():
         x[x<=0] = 0
         x[x>0] = 1
         return x
-    
-    def sigmoid(self,Z):
-        '''
-        The Sigmoid activation function is to performs a threshold
-        operation to each input element where values less
-        than zero are set to zero.
-        '''
-        return 1/(1+np.exp(-Z))
-    
+
 if __name__  == "__main__":
     #take csv from /datasets
     df = pd.read_csv('datasets/data.csv', header=None)
@@ -238,16 +214,10 @@ if __name__  == "__main__":
     print(X.shape[1])
     nn = MyNeuralNetwork(X.shape[1], alpha=0.001, epochs=100)
     nn.fit(X, y)
-    #plot graph of learning curve
-    """
-    plt.plot(range(1, len(nn.loss) + 1), nn.loss)
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.show()
-    """
 
     #predict on test data
     yhat = nn.predict(X_test, y_test)
     #print("yhat: ", yhat)
-    #print accuracy in % only 2 decimal places
-    print("Accuracy: ", round(100 * np.mean(yhat == y_test), 2), "%")
+    print("y_test: ", y_test.shape)
+    print("Accuracy: ", accuracy_score(y_test, yhat))
+
